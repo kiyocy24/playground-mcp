@@ -3,10 +3,11 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // startTestServer runs the MCP server behind an httptest server and
@@ -24,9 +25,7 @@ func startTestServer(t *testing.T) *mcp.ClientSession {
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.0.1"}, nil)
 	session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{Endpoint: ts.URL}, nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
+	require.NoError(t, err, "failed to connect")
 	t.Cleanup(func() { session.Close() })
 
 	return session
@@ -39,16 +38,12 @@ func callTool(t *testing.T, session *mcp.ClientSession, name string, args map[st
 		Name:      name,
 		Arguments: args,
 	})
-	if err != nil {
-		t.Fatalf("CallTool(%s) failed: %v", name, err)
-	}
-	if result.IsError {
-		t.Fatalf("CallTool(%s) returned tool error: %+v", name, result.Content)
-	}
+	require.NoError(t, err, "CallTool(%s) failed", name)
+	require.False(t, result.IsError, "CallTool(%s) returned tool error: %+v", name, result.Content)
+	require.NotEmpty(t, result.Content)
+
 	text, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		t.Fatalf("CallTool(%s): expected TextContent, got %T", name, result.Content[0])
-	}
+	require.True(t, ok, "CallTool(%s): expected TextContent, got %T", name, result.Content[0])
 	return text.Text
 }
 
@@ -56,46 +51,32 @@ func TestListTools(t *testing.T) {
 	session := startTestServer(t)
 
 	result, err := session.ListTools(t.Context(), nil)
-	if err != nil {
-		t.Fatalf("ListTools failed: %v", err)
-	}
+	require.NoError(t, err)
 
-	want := map[string]bool{"greet": false, "add": false, "now": false}
+	var names []string
 	for _, tool := range result.Tools {
-		if _, ok := want[tool.Name]; ok {
-			want[tool.Name] = true
-		}
+		names = append(names, tool.Name)
 	}
-	for name, found := range want {
-		if !found {
-			t.Errorf("tool %q not found", name)
-		}
-	}
+	assert.ElementsMatch(t, []string{"greet", "add", "now"}, names)
 }
 
 func TestGreet(t *testing.T) {
 	session := startTestServer(t)
 
 	got := callTool(t, session, "greet", map[string]any{"name": "Cloud Run"})
-	if !strings.Contains(got, "Hello, Cloud Run!") {
-		t.Errorf("unexpected greeting: %q", got)
-	}
+	assert.Contains(t, got, "Hello, Cloud Run!")
 }
 
 func TestAdd(t *testing.T) {
 	session := startTestServer(t)
 
 	got := callTool(t, session, "add", map[string]any{"a": 2, "b": 3})
-	if !strings.Contains(got, "= 5") {
-		t.Errorf("unexpected sum: %q", got)
-	}
+	assert.Contains(t, got, "= 5")
 }
 
 func TestNow(t *testing.T) {
 	session := startTestServer(t)
 
 	got := callTool(t, session, "now", map[string]any{"timezone": "Asia/Tokyo"})
-	if !strings.Contains(got, "+09:00") {
-		t.Errorf("expected JST offset in %q", got)
-	}
+	assert.Contains(t, got, "+09:00", "expected JST offset")
 }

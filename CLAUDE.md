@@ -29,6 +29,10 @@ gofmt -l .            # フォーマットチェック
 go run ./cmd/server   # サーバ起動(PORT 環境変数でポート指定、デフォルト 8080)
 ```
 
+## テストの方針
+
+- アサーションには `github.com/stretchr/testify`(`require` / `assert`)を使う。`google/go-cmp` は使わない。
+
 ## アーキテクチャ上の前提
 
 - Cloud Run で動かすため、MCP のトランスポートは stdio ではなく **Streamable HTTP** を使う(`mcp.NewStreamableHTTPHandler`)。
