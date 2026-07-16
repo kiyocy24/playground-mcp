@@ -27,10 +27,21 @@ variable "image" {
   default     = ""
 }
 
+variable "invoker_members" {
+  description = "サービスの呼び出しを許可する IAM メンバー(例: [\"user:alice@example.com\", \"serviceAccount:ci@project.iam.gserviceaccount.com\"])"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for m in var.invoker_members : can(regex("^(user|group|serviceAccount|domain):", m))])
+    error_message = "invoker_members の各要素は user: / group: / serviceAccount: / domain: のいずれかで始まる必要があります。"
+  }
+}
+
 variable "allow_unauthenticated" {
-  description = "未認証アクセスを許可するか(検証用。実運用では false にして IAM 認証を使う)"
+  description = "未認証アクセス(allUsers)を許可するか。特定ユーザーのみに限定する場合は false のまま invoker_members を使う"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "min_instances" {

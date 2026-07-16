@@ -51,7 +51,7 @@ go test ./...
    ```sh
    cd terraform
    cp terraform.tfvars.example terraform.tfvars
-   # project_id などを編集
+   # project_id とアクセスを許可するユーザー(invoker_members)を編集
    ```
 
 2. まず Artifact Registry と API 有効化だけを適用する(初回はイメージがまだ無いため):
@@ -78,7 +78,25 @@ go test ./...
 
    出力される `mcp_endpoint` が MCP エンドポイントです。以降イメージを更新した場合は、手順 3 の後に `terraform apply` を再実行するか、タグ付きイメージを `image` 変数で指定してください。
 
-> **Note**: `allow_unauthenticated = true`(デフォルト)は検証用です。実運用では `false` にして IAM 認証(ID トークン)や MCP レイヤでの認可を検討してください。
+### アクセス制御
+
+デフォルトでは IAM 認証が有効で、`invoker_members` に列挙したメンバーだけがアクセスできます:
+
+```hcl
+invoker_members = [
+  "user:alice@example.com",
+  "serviceAccount:ci@your-project-id.iam.gserviceaccount.com",
+]
+```
+
+許可されたユーザーは ID トークンを付けてアクセスします:
+
+```sh
+curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  https://<service-url>/healthz
+```
+
+> **Note**: 誰でもアクセスできるようにしたい場合(検証用)は `allow_unauthenticated = true` を設定してください。
 
 ### gcloud で直接デプロイする
 
@@ -95,8 +113,11 @@ gcloud run deploy playground-mcp \
 
 ## MCP クライアントからの接続
 
-Claude Code から接続する例:
+Claude Code から接続する例(IAM 認証ありの場合は ID トークンをヘッダで渡す):
 
 ```sh
-claude mcp add --transport http playground-mcp https://<service-url>/mcp
+claude mcp add --transport http playground-mcp https://<service-url>/mcp \
+  --header "Authorization: Bearer $(gcloud auth print-identity-token)"
 ```
+
+> **Note**: ID トークンの有効期限は約 1 時間です。期限切れになったら同じコマンドでヘッダを更新してください。`allow_unauthenticated = true` でデプロイした場合は `--header` は不要です。

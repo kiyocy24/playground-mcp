@@ -29,6 +29,12 @@ resource "google_artifact_registry_repository" "mcp" {
   depends_on = [google_project_service.artifact_registry]
 }
 
+# Cloud Run 実行用のサービスアカウント(最小権限: 追加ロールは付与しない)
+resource "google_service_account" "mcp_runner" {
+  account_id   = "${var.service_name}-runner"
+  display_name = "Service account for the ${var.service_name} Cloud Run service"
+}
+
 # MCP サーバ本体
 resource "google_cloud_run_v2_service" "mcp" {
   name     = var.service_name
@@ -36,6 +42,8 @@ resource "google_cloud_run_v2_service" "mcp" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    service_account = google_service_account.mcp_runner.email
+
     scaling {
       min_instance_count = var.min_instances
       max_instance_count = var.max_instances
@@ -54,7 +62,8 @@ resource "google_cloud_run_v2_service" "mcp" {
           cpu    = "1"
           memory = "512Mi"
         }
-        cpu_idle = true
+        # Streamable HTTP は SSE の長時間接続を使うため CPU を常時割り当てる
+        cpu_idle = false
       }
 
       startup_probe {
@@ -78,11 +87,22 @@ resource "google_cloud_run_v2_service" "mcp" {
   depends_on = [google_project_service.run]
 }
 
-# 検証用: 未認証アクセスを許可
-resource "google_cloud_run_v2_service_iam_member" "invoker" {
+# 指定したメンバーにのみ呼び出しを許可(IAM 認証)
+resource "google_cloud_run_v2_service_iam_member" "invokers" {
+  for_each = toset(var.invoker_members)
+
+  project  = var.project_id
+  location = google_cloud_run_v2_service.mcp.location
+  name     = google_cloud_run_v2_service.mcp.name
+  role     = "roles/run.invoker"
+  member   = each.value
+}
+
+# 検証用: 未認証アクセスを許可する場合のみ
+resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   count = var.allow_unauthenticated ? 1 : 0
 
-  project  = google_cloud_run_v2_service.mcp.project
+  project  = var.project_id
   location = google_cloud_run_v2_service.mcp.location
   name     = google_cloud_run_v2_service.mcp.name
   role     = "roles/run.invoker"
