@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,7 +23,7 @@ func startTestServer(t *testing.T) *mcp.ClientSession {
 	t.Cleanup(ts.Close)
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.0.1"}, nil)
-	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: ts.URL}, nil)
+	session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{Endpoint: ts.URL}, nil)
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
@@ -36,7 +35,7 @@ func startTestServer(t *testing.T) *mcp.ClientSession {
 func callTool(t *testing.T, session *mcp.ClientSession, name string, args map[string]any) string {
 	t.Helper()
 
-	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+	result, err := session.CallTool(t.Context(), &mcp.CallToolParams{
 		Name:      name,
 		Arguments: args,
 	})
@@ -56,7 +55,7 @@ func callTool(t *testing.T, session *mcp.ClientSession, name string, args map[st
 func TestListTools(t *testing.T) {
 	session := startTestServer(t)
 
-	result, err := session.ListTools(context.Background(), nil)
+	result, err := session.ListTools(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("ListTools failed: %v", err)
 	}

@@ -117,8 +117,15 @@ func main() {
 	})
 
 	addr := ":" + port
+	// Only ReadHeaderTimeout is set: WriteTimeout would cut off
+	// long-lived streamable HTTP (SSE) responses.
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	log.Printf("%s listening on %s (MCP endpoint: /mcp)", serverName, addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server failed: %v", err)
 	}
 }
