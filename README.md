@@ -7,7 +7,8 @@ Google Cloud Run 上で MCP (Model Context Protocol) サーバを動かすため
 
 - `cmd/server` — MCP サーバ本体。`/mcp` で MCP (Streamable HTTP)、`/healthz` でヘルスチェックを提供
 - `Dockerfile` — マルチステージビルド(distroless イメージ)
-- `terraform/` — Cloud Run へデプロイするための Terraform 構成
+- `terraform/` — Cloud Run へデプロイするための Terraform 構成(Workload Identity Federation 含む)
+- `.github/workflows/deploy.yml` — main への push で Cloud Run へ自動デプロイ(OIDC 認証)
 
 ### 提供ツール
 
@@ -97,6 +98,31 @@ curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
 ```
 
 > **Note**: 誰でもアクセスできるようにしたい場合(検証用)は `allow_unauthenticated = true` を設定してください。
+
+### GitHub Actions で自動デプロイする(OIDC)
+
+main ブランチへの push をトリガーに、`.github/workflows/deploy.yml` がイメージのビルド・push と Cloud Run へのデプロイを行います。認証はサービスアカウントキーではなく **Workload Identity Federation(OIDC)** を使うため、GitHub にクレデンシャルを保存する必要はありません。
+
+セットアップ手順:
+
+1. Terraform を適用して Workload Identity Pool / Provider とデプロイ用サービスアカウントを作成する:
+
+   ```sh
+   cd terraform
+   terraform apply
+   ```
+
+2. 出力された値を GitHub リポジトリの **Actions variables**(Settings → Secrets and variables → Actions → Variables)に設定する:
+
+   | 変数名 | 値 |
+   | --- | --- |
+   | `GCP_PROJECT_ID` | プロジェクト ID |
+   | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `terraform output -raw workload_identity_provider` |
+   | `GCP_DEPLOYER_SERVICE_ACCOUNT` | `terraform output -raw deployer_service_account` |
+
+3. main に push すると自動でデプロイされます(Actions タブから手動実行も可能)。
+
+イメージにはコミット SHA と `latest` の 2 つのタグが付きます。Workload Identity Provider には `assertion.repository` の条件が設定されており、このリポジトリの GitHub Actions 以外からはサービスアカウントを借用できません。また Terraform 側は `ignore_changes` でイメージの差分を無視するため、CI のデプロイ後に `terraform apply` してもイメージは巻き戻りません。
 
 ### gcloud で直接デプロイする
 

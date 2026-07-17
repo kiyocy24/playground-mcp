@@ -5,6 +5,9 @@ region     = "asia-northeast1"
 # イメージを明示指定する場合(省略時は Artifact Registry の <service_name>:latest)
 # image = "asia-northeast1-docker.pkg.dev/your-project-id/playground-mcp/playground-mcp:v0.1.0"
 
+# GitHub Actions からの OIDC デプロイを許可するリポジトリ(owner/repo)
+# github_repository = "kiyocy24/playground-mcp"
+
 # サービスの呼び出しを許可するユーザー / サービスアカウント
 invoker_members = [
   "user:you@example.com",
