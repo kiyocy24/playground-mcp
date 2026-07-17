@@ -1,0 +1,70 @@
+# NOTE: このファイルは .github/workflows/deploy.yml として配置するワークフローです。
+# PR 作成に使用したトークンに workflow スコープがなく .github/workflows/ 配下へ
+# 直接 push できなかったため、一時的にこのパスに置いています。
+# マージ後(またはマージ前にこのブランチ上で)以下を実行してください:
+#
+#   git mv .github/deploy-workflow.yml .github/workflows/deploy.yml
+#
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGION: asia-northeast1
+  SERVICE: playground-mcp
+  REPOSITORY: playground-mcp
+
+# デプロイの並走を防ぐ(後続の push は先行の完了を待つ)
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # OIDC トークンの発行に id-token: write が必要
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud (OIDC)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Build and push image
+        id: image
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${REPOSITORY}/${SERVICE}"
+          docker build -t "${IMAGE}:${GITHUB_SHA}" -t "${IMAGE}:latest" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"
+          echo "name=${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: ${{ steps.image.outputs.name }}
+
+      - name: Show deployed URL
+        run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
