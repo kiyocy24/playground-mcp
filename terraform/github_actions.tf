@@ -58,11 +58,13 @@ resource "google_artifact_registry_repository_iam_member" "github_deployer_write
   member     = "serviceAccount:${google_service_account.github_deployer.email}"
 }
 
-# Cloud Run サービスの更新(デプロイ)
-resource "google_project_iam_member" "github_deployer_run" {
-  project = var.project_id
-  role    = "roles/run.developer"
-  member  = "serviceAccount:${google_service_account.github_deployer.email}"
+# Cloud Run サービスの更新(デプロイ)。対象サービスに限定して付与する
+resource "google_cloud_run_v2_service_iam_member" "github_deployer_developer" {
+  project  = var.project_id
+  location = google_cloud_run_v2_service.mcp.location
+  name     = google_cloud_run_v2_service.mcp.name
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${google_service_account.github_deployer.email}"
 }
 
 # 実行用 SA(mcp_runner)を指定してデプロイするために必要
