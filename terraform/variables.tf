@@ -27,6 +27,17 @@ variable "image" {
   default     = ""
 }
 
+variable "github_repository" {
+  description = "OIDC でのデプロイを許可する GitHub リポジトリ(owner/repo 形式)"
+  type        = string
+  default     = "kiyocy24/playground-mcp"
+
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.github_repository))
+    error_message = "github_repository は owner/repo 形式で指定してください。"
+  }
+}
+
 variable "invoker_members" {
   description = "サービスの呼び出しを許可する IAM メンバー(例: [\"user:alice@example.com\", \"serviceAccount:ci@project.iam.gserviceaccount.com\"])"
   type        = list(string)

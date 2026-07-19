@@ -84,6 +84,18 @@ resource "google_cloud_run_v2_service" "mcp" {
     }
   }
 
+  # イメージの更新は GitHub Actions(コミット SHA タグ)が行うため、
+  # terraform apply で :latest に巻き戻さない。トラフィック配分も
+  # デプロイ側の操作を上書きしないよう無視する
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      traffic,
+      client,
+      client_version,
+    ]
+  }
+
   depends_on = [google_project_service.run]
 }
 
