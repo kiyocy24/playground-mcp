@@ -1,10 +1,3 @@
-# NOTE: このファイルは .github/workflows/deploy.yml として配置するワークフローです。
-# PR 作成に使用したトークンに workflow スコープがなく .github/workflows/ 配下へ
-# 直接 push できなかったため、一時的にこのパスに置いています。
-# マージ後(またはマージ前にこのブランチ上で)以下を実行してください:
-#
-#   git mv .github/deploy-workflow.yml .github/workflows/deploy.yml
-#
 name: Deploy
 
 on:
